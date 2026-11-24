@@ -43,7 +43,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/src:ro" \
             -w /src \
             semgrep/semgrep:latest \
-            semgrep scan --config auto --metrics off app.py
+            semgrep scan --config auto app.py
 
       - name: Dependency scan (Trivy report)
         if: ${{ !cancelled() }}
