@@ -1,0 +1,54 @@
+name: security
+
+on: [push, pull_request]
+
+jobs:
+  scan:
+    name: Security checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Secret scan (Gitleaks gate)
+        run: |
+          cat > "$RUNNER_TEMP/gitleaks-lab.toml" <<'EOF'
+          [extend]
+          useDefault = true
+
+          [[rules]]
+          id = "lab-aws-example-key"
+          description = "Planted AWS documentation key for the CI lab"
+          regex = '''AKIAIOSFODNN7EXAMPLE'''
+          path = '''(^|/)config\.py$'''
+          EOF
+
+          docker run --rm \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0=/repo \
+            -v "$GITHUB_WORKSPACE:/repo:ro" \
+            -v "$RUNNER_TEMP/gitleaks-lab.toml:/gitleaks-lab.toml:ro" \
+            ghcr.io/gitleaks/gitleaks:latest \
+            git --config /gitleaks-lab.toml --redact --exit-code 1 /repo
+
+      - name: Source scan (Semgrep report)
+        if: ${{ !cancelled() }}
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src:ro" \
+            -w /src \
+            semgrep/semgrep:latest \
+            semgrep scan --config auto --metrics off app.py
+
+      - name: Dependency scan (Trivy report)
+        if: ${{ !cancelled() }}
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo:ro" \
+            aquasec/trivy:latest \
+            fs --scanners vuln --exit-code 0 /repo
