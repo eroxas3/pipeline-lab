@@ -48,10 +48,10 @@ jobs:
             semgrep/semgrep:latest \
             semgrep scan --config auto app.py
 
-      - name: Dependency scan (Trivy report)
+      - name: Dependency scan (Trivy gate)
         if: ${{ !cancelled() }}
         run: |
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/repo:ro" \
             aquasec/trivy:latest \
-            fs --scanners vuln --exit-code 0 /repo
+            fs --scanners vuln --exit-code 1 /repo
